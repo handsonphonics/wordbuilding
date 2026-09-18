@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Mrs. Butler Interactive Phonics Board</title>
+<style>
+:root{
+  --blue:#12A8DF; --red:#F23846; --green:#78D62F;
+  --purple:#B956C8; --pink:#F33E94; --teal:#13B97A; --black:#222;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;font-family:"Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif}
+body{display:flex;align-items:center;justify-content:center}
+
+/* SAFE AREA: the whole interactive board stays well away from all 4 screen edges */
+.wrap{position:relative;width:88vw;height:86vh}
+.board{
+ position:absolute;inset:0;border:7px solid #168FE5;border-radius:24px;background:#fff;
+ padding:1.25%;overflow:hidden;
+ display:grid;grid-template-columns:49% 49%;grid-template-rows:29% 69%;
+ column-gap:2%;row-gap:2%;
+}
+.top{grid-column:1;grid-row:1;display:grid;grid-template-rows:68% 32%;min-width:0;min-height:0}
+.word{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:3px solid #777;min-width:0;min-height:0}
+.slot{border-right:2px solid #777;display:flex;align-items:center;justify-content:center;overflow:hidden;
+ font-family:"Arial Rounded MT Bold","Trebuchet MS",Arial,sans-serif;font-weight:1000;font-size:min(5.8vw,9.2vh);line-height:.92;-webkit-text-stroke:.35px currentColor}
+.slot:last-child{border-right:0}
+.arrowzone{position:relative;min-height:0}
+.arrow{position:absolute;left:2%;right:9%;top:34%;height:6px;background:#168FE5;border-radius:6px}
+.arrow:before{content:"";position:absolute;left:-3px;top:-7px;width:20px;height:20px;border-radius:50%;background:#168FE5}
+.arrow:after{content:"";position:absolute;right:-20px;top:-9px;border-left:22px solid #168FE5;border-top:12px solid transparent;border-bottom:12px solid transparent}
+
+.left{grid-column:1;grid-row:2;display:grid;grid-template-rows:auto 1fr;min-width:0;min-height:0}
+.right{grid-column:2;grid-row:1/3;display:grid;grid-template-rows:repeat(5,minmax(0,1fr));gap:.45%;min-width:0;min-height:0}
+.heading{font-weight:900;font-size:min(1.55vw,2.65vh);line-height:1;margin:0 0 .35vh;white-space:nowrap}
+.alpha{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr));gap:.35%;min-height:0}
+.cell{border:1px solid #ddd;border-radius:5px;background:#fff;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:hidden}
+.key{appearance:none;border:0;background:#fff;padding:0;cursor:pointer;user-select:none;touch-action:manipulation;
+ font-weight:900;font-size:min(4vw,6.4vh);line-height:1;display:flex;align-items:center;justify-content:center}
+.key:active{transform:scale(.92)}
+.school-a{font-family:"Comic Sans MS","Chalkboard SE","Arial Rounded MT Bold",sans-serif;font-weight:900}.slot.school-a{font-weight:1000;-webkit-text-stroke:.55px currentColor}
+.blue{color:var(--blue)} .red{color:var(--red)} .green{color:var(--green)}
+.purple{color:var(--purple)} .pink{color:var(--pink)} .teal{color:var(--teal)} .black{color:var(--black)}
+
+.dual-y{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;justify-items:stretch}
+.dual-y .key{width:100%;height:100%;min-width:0;min-height:0;font-size:min(2.6vw,4.2vh);display:flex;align-items:center;justify-content:center}
+.heartcell{cursor:grab;font-size:min(3.2vw,5vh);line-height:1;user-select:none;touch-action:none}
+
+.section{display:grid;grid-template-rows:auto 1fr;min-height:0;min-width:0;overflow:hidden}
+.patterns{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:2% 1.2%;min-width:0;min-height:0}
+.patterns .key{width:100%;height:100%;border:1px solid #ddd;border-radius:5px;font-size:min(3.25vw,5.35vh);overflow:hidden}
+.patterns .small{font-size:min(2.75vw,4.45vh)}
+
+/* Additional Sounds are deliberately BLACK text on WHITE boxes */
+.additional .key{color:#222;background:#fff;border:2px solid #aaa}
+
+.clear{position:absolute;right:1.3%;bottom:1.3%;z-index:30;border:2px solid #aaa;background:#fff;border-radius:999px;
+ padding:.45vh .85vw;font-weight:800;font-size:min(1vw,1.7vh);cursor:pointer}
+.dragheart{position:absolute;z-index:25;display:none;font-size:min(3.2vw,5vh);line-height:1;cursor:grabbing;user-select:none;touch-action:none}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+ <div class="board">
+   <div class="top">
+     <div class="word">
+       <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+       <div class="slot"></div><div class="slot"></div><div class="slot"></div>
+     </div>
+     <div class="arrowzone"><div class="arrow"></div></div>
+   </div>
+
+   <section class="left">
+     <div class="heading">Consonants and Vowels</div>
+     <div class="alpha" id="alpha"></div>
+   </section>
+
+   <section class="right" id="right"></section>
+ </div>
+ <div class="dragheart" id="dragheart">❤️</div>
+ <button class="clear" id="clear">Clear Word</button>
+</div>
+
+<script>
+let serial=0;
+const keys=new Map();
+const slots=[...document.querySelectorAll(".slot")];
+
+function addKey(text,color,parent,small=false){
+ const b=document.createElement("button");
+ b.className="key "+color+(small?" small":"")+(text.includes("a")?" school-a":"");
+ b.textContent=text;b.dataset.id="k"+(++serial);
+ b.onclick=()=>useKey(b);
+ parent.appendChild(b);keys.set(b.dataset.id,b);
+ return b;
+}
+
+const alpha=document.getElementById("alpha");
+const vowels=new Set(["a","e","i","o","u"]);
+const letters="abcdefghijklmnopqrstuvwxyz".split("");
+
+letters.forEach(ch=>{
+ const cell=document.createElement("div");
+ cell.className="cell"+(ch==="y"?" dual-y":"");
+ alpha.appendChild(cell);
+ if(ch==="y"){
+   addKey("y","blue",cell);
+   addKey("y","red",cell); // red y BESIDE blue y in same-size box
+ } else addKey(ch,vowels.has(ch)?"red":"blue",cell);
+});
+
+/* Heart gets its OWN same-size alphabet box immediately after z */
+const heartCell=document.createElement("div");
+heartCell.className="cell heartcell";
+heartCell.id="heartHome";
+heartCell.textContent="❤️";
+alpha.appendChild(heartCell);
+
+/* Fill remaining equal-size grid boxes invisibly so every box stays identical */
+while(alpha.children.length<30){
+ const blank=document.createElement("div");blank.className="cell";alpha.appendChild(blank);
+}
+
+const groups=[
+ ["Digraphs","green",["ch","sh","th","wh","ph","ck","ng","nk","tch"]],
+ ["R-Controlled Vowels","purple",["ar","er","ir","or","ur"]],
+ ["Vowel Teams","pink",["ai","ay","ee","ea","ey","ie","igh","oa","oe","oo","ue","ui","ew"]],
+ ["Diphthongs","teal",["oi","oy","ow","ou","aw","au"]],
+ ["Additional Sounds","black",["qu","ss","zz","dge","kn","wr","gn","mb"]]
+];
+
+const right=document.getElementById("right");
+groups.forEach(([title,color,items])=>{
+ const sec=document.createElement("div");
+ sec.className="section"+(title==="Additional Sounds"?" additional":"");
+ const h=document.createElement("div");h.className="heading";h.textContent=title;
+ const grid=document.createElement("div");grid.className="patterns";
+ sec.append(h,grid);right.appendChild(sec);
+ items.forEach(x=>addKey(x,color,grid,x.length>2));
+});
+
+function colorOf(k){
+ return [...k.classList].find(x=>["blue","red","green","purple","pink","teal","black"].includes(x))||"black";
+}
+function useKey(k){
+ const old=slots.find(s=>s.dataset.key===k.dataset.id);
+ if(old){clearSlot(old);return}
+ const empty=slots.find(s=>!s.dataset.key);if(!empty)return;
+ empty.dataset.key=k.dataset.id;empty.textContent=k.textContent;empty.className="slot "+colorOf(k)+(k.classList.contains("school-a")?" school-a":"");
+ k.style.visibility="hidden";
+}
+function clearSlot(s){
+ if(!s.dataset.key)return;
+ const k=keys.get(s.dataset.key);if(k)k.style.visibility="visible";
+ s.textContent="";delete s.dataset.key;s.className="slot";
+}
+slots.forEach(s=>s.onclick=()=>clearSlot(s));
+
+/* Drag heart from its box. It returns beside Z whenever Clear Word is pressed. */
+const wrap=document.getElementById("wrap"),home=document.getElementById("heartHome"),heart=document.getElementById("dragheart");
+let dragging=false,dx=0,dy=0;
+function resetHeart(){heart.style.display="none";home.style.visibility="visible"}
+function beginHeart(e){
+ const wr=wrap.getBoundingClientRect(),r=home.getBoundingClientRect();
+ home.style.visibility="hidden";heart.style.display="block";
+ heart.style.left=(r.left-wr.left+(r.width-heart.offsetWidth)/2)+"px";
+ heart.style.top=(r.top-wr.top+(r.height-heart.offsetHeight)/2)+"px";
+ dragging=true;
+ const hr=heart.getBoundingClientRect();dx=e.clientX-hr.left;dy=e.clientY-hr.top;
+ heart.setPointerCapture(e.pointerId);
+}
+home.addEventListener("pointerdown",beginHeart);
+heart.addEventListener("pointerdown",e=>{
+ dragging=true;heart.setPointerCapture(e.pointerId);
+ const r=heart.getBoundingClientRect();dx=e.clientX-r.left;dy=e.clientY-r.top;
+});
+heart.addEventListener("pointermove",e=>{
+ if(!dragging)return;
+ const wr=wrap.getBoundingClientRect();
+ let x=e.clientX-wr.left-dx,y=e.clientY-wr.top-dy;
+ x=Math.max(8,Math.min(wr.width-heart.offsetWidth-8,x));
+ y=Math.max(8,Math.min(wr.height-heart.offsetHeight-8,y));
+ heart.style.left=x+"px";heart.style.top=y+"px";
+});
+heart.addEventListener("pointerup",()=>dragging=false);
+heart.addEventListener("pointercancel",()=>dragging=false);
+
+document.getElementById("clear").onclick=()=>{slots.forEach(clearSlot);resetHeart()};
+window.addEventListener("resize",resetHeart);
+</script>
+</body>
+</html>
